@@ -41,85 +41,89 @@ export class TimeTraceViewer {
     }
 
     init() {
-        if (!this.container) return; // Guard if elements are not present
+        if (!this.container) return; 
 
         this.bindZoomEvents();
         this.bindScannerEvents();
         this.bindComparisonEvents();
 
-        // Initial hidden state
         this.container.style.display = 'none';
     }
 
     show(originalImgSrc, processedBlob) {
+        if (!this.container) return;
         this.container.style.display = 'block';
         const processedUrl = URL.createObjectURL(processedBlob);
-        
         this.updateImages(originalImgSrc, processedUrl);
-        
-        // Scroll to container
         this.container.scrollIntoView({ behavior: 'smooth' });
     }
 
     updateImages(originalSrc, processedUrl) {
-        // Update Zoom Section
-        this.beforeImgEl.src = originalSrc;
-        this.beforeImgEl.style.filter = 'none';
+        if (this.beforeImgEl) {
+            this.beforeImgEl.src = originalSrc;
+            this.beforeImgEl.style.filter = 'none';
+        }
         this.afterImgUrl = processedUrl;
         
-        // Update Scanner Section
-        this.scanBefore.src = originalSrc;
-        this.scanAfter.src = processedUrl;
-        this.scanBefore.style.filter = 'none';
+        if (this.scanBefore) {
+            this.scanBefore.src = originalSrc;
+            this.scanBefore.style.filter = 'none';
+        }
+        if (this.scanAfter) this.scanAfter.src = processedUrl;
         
-        // Update Comparison Section
-        this.previewBefore.src = originalSrc;
-        this.previewAfter.src = processedUrl;
-        this.previewBefore.style.filter = 'none';
+        if (this.previewBefore) {
+            this.previewBefore.src = originalSrc;
+            this.previewBefore.style.filter = 'none';
+        }
+        if (this.previewAfter) this.previewAfter.src = processedUrl;
 
-        // Wait for images to load before initializing logic
         const initLogic = () => {
             this.initZoom();
             this.detectScanDirection();
             this.syncScannerImageSize();
         };
 
-        if (this.scanBefore.complete) {
+        if (this.scanBefore && this.scanBefore.complete) {
             initLogic();
-        } else {
+        } else if (this.scanBefore) {
             this.scanBefore.onload = initLogic;
         }
     }
 
-    // --- Zoom Logic ---
     bindZoomEvents() {
+        if (!this.imgContainer) return;
+
         this.imgContainer.addEventListener('mouseenter', () => { 
-            this.zoomLens.style.display = 'block'; 
+            if (this.zoomLens) this.zoomLens.style.display = 'block'; 
             this.isCursorInside = true; 
             this.initZoom(); 
         });
         this.imgContainer.addEventListener('mouseleave', () => { 
-            this.zoomLens.style.display = 'none'; 
+            if (this.zoomLens) this.zoomLens.style.display = 'none'; 
             this.isCursorInside = false; 
         });
         this.imgContainer.addEventListener('mousemove', (e) => this.moveLens(e));
         this.imgContainer.addEventListener('touchmove', (e) => this.moveLens(e), {passive: false});
         this.imgContainer.addEventListener('touchstart', (e) => { 
-            this.zoomLens.style.display = 'block'; 
+            if (this.zoomLens) this.zoomLens.style.display = 'block'; 
             this.isCursorInside = true; 
             this.initZoom(); 
             this.moveLens(e); 
         });
         
-        this.lensSizeSlider.addEventListener('input', (e) => {
-            const val = parseFloat(e.target.value);
-            this.zoomLevelDisplay.textContent = val.toFixed(1) + "x";
-            if (this.isCursorInside) this.updateLensAndBackground();
-            else {
-                const cx = val;
-                this.zoomResult.style.backgroundSize = (this.beforeImgEl.width * cx) + "px " + (this.beforeImgEl.height * cx) + "px";
-            }
-        });
+        if (this.lensSizeSlider) {
+            this.lensSizeSlider.addEventListener('input', (e) => {
+                const val = parseFloat(e.target.value);
+                if (this.zoomLevelDisplay) this.zoomLevelDisplay.textContent = val.toFixed(1) + "x";
+                if (this.isCursorInside) this.updateLensAndBackground();
+                else {
+                    const cx = val;
+                    if (this.zoomResult && this.beforeImgEl) {
+                        this.zoomResult.style.backgroundSize = (this.beforeImgEl.width * cx) + "px " + (this.beforeImgEl.height * cx) + "px";
+                    }
+                }
+            });
+        }
 
         window.addEventListener('resize', () => {
             this.initZoom();
@@ -128,16 +132,14 @@ export class TimeTraceViewer {
     }
 
     initZoom() {
+        if (!this.zoomResult || !this.beforeImgEl) return;
         this.zoomResult.style.backgroundImage = `url('${this.afterImgUrl}')`;
-        if(window.innerWidth >= 768 && this.beforeImgEl.complete && this.beforeImgEl.naturalHeight > 0) {
-            // Sync height for better layout
-             // this.zoomResult.style.height = this.beforeImgEl.offsetHeight + "px";
-        }
-        const cx = parseFloat(this.lensSizeSlider.value);
+        const cx = this.lensSizeSlider ? parseFloat(this.lensSizeSlider.value) : 3;
         this.zoomResult.style.backgroundSize = (this.beforeImgEl.width * cx) + "px " + (this.beforeImgEl.height * cx) + "px";
     }
 
     moveLens(e) {
+        if (!this.isCursorInside) return;
         e.preventDefault();
         if (this.resultHint) this.resultHint.style.display = 'none';
         
@@ -151,12 +153,12 @@ export class TimeTraceViewer {
     }
 
     updateLensAndBackground() {
-        if (!this.isCursorInside) return;
+        if (!this.isCursorInside || !this.beforeImgEl || !this.zoomLens || !this.zoomResult) return;
         const a = this.beforeImgEl.getBoundingClientRect();
         let x = this.lastCursorX - a.left; 
         let y = this.lastCursorY - a.top;
 
-        const cx = parseFloat(this.lensSizeSlider.value);
+        const cx = this.lensSizeSlider ? parseFloat(this.lensSizeSlider.value) : 3;
         const lensW = this.zoomResult.offsetWidth / cx;
         const lensH = this.zoomResult.offsetHeight / cx;
         
@@ -177,40 +179,39 @@ export class TimeTraceViewer {
         this.zoomResult.style.backgroundPosition = "-" + (lensX * cx) + "px -" + (lensY * cx) + "px";
     }
 
-    // --- Scanner Logic ---
     bindScannerEvents() {
-        this.btnPause.addEventListener('click', () => this.toggleScanPause());
-        this.scanSpeed.addEventListener('change', () => this.updateScanSpeed());
+        if (this.btnPause) this.btnPause.addEventListener('click', () => this.toggleScanPause());
+        if (this.scanSpeed) this.scanSpeed.addEventListener('change', () => this.updateScanSpeed());
         
-        // Manual direction buttons
-        document.getElementById('scanDirH').addEventListener('click', () => this.forceScanDirection('h'));
-        document.getElementById('scanDirV').addEventListener('click', () => this.forceScanDirection('v'));
+        const btnH = document.getElementById('scanDirH');
+        const btnV = document.getElementById('scanDirV');
+        if (btnH) btnH.addEventListener('click', () => this.forceScanDirection('h'));
+        if (btnV) btnV.addEventListener('click', () => this.forceScanDirection('v'));
         
-        this.btnDownload.addEventListener('click', () => this.generateVideo());
+        if (this.btnDownload) this.btnDownload.addEventListener('click', () => this.generateVideo());
     }
 
     syncScannerImageSize() {
+        if (!this.scanBefore || !this.scanAfter) return;
         const width = this.scanBefore.offsetWidth;
         const height = this.scanBefore.offsetHeight;
-        
         if (width === 0 || height === 0) return;
-
         this.scanAfter.style.width = width + 'px';
         this.scanAfter.style.height = height + 'px';
     }
 
     detectScanDirection() {
+        if (!this.scannerStage || !this.scanBefore) return;
         this.scannerStage.classList.remove('animate-scan-h', 'animate-scan-v');
         if (this.scanBefore.naturalWidth > this.scanBefore.naturalHeight) {
             this.scannerStage.classList.add('animate-scan-h');
-            return 'h';
         } else {
             this.scannerStage.classList.add('animate-scan-v');
-            return 'v';
         }
     }
 
     forceScanDirection(dir) {
+        if (!this.scannerStage) return;
         this.scannerStage.classList.remove('animate-scan-h', 'animate-scan-v');
         if(dir === 'h') this.scannerStage.classList.add('animate-scan-h');
         else this.scannerStage.classList.add('animate-scan-v');
@@ -218,6 +219,7 @@ export class TimeTraceViewer {
     }
 
     toggleScanPause() {
+        if (!this.scannerStage || !this.btnPause) return;
         this.scannerStage.classList.toggle('paused');
         const isPaused = this.scannerStage.classList.contains('paused');
         const icon = isPaused ? 'play' : 'pause';
@@ -226,6 +228,7 @@ export class TimeTraceViewer {
     }
 
     updateScanSpeed() {
+        if (!this.scanSpeed || !this.scannerStage) return;
         const speed = parseFloat(this.scanSpeed.value);
         const baseDuration = 4; 
         const newDuration = baseDuration / speed;
@@ -237,6 +240,7 @@ export class TimeTraceViewer {
             alert("您的浏览器不支持视频录制功能。");
             return;
         }
+        if (!this.scanBefore || !this.scanAfter || !this.btnDownload) return;
 
         const originalBtnHtml = this.btnDownload.innerHTML;
         this.btnDownload.innerHTML = `<i data-lucide="loader" class="w-3 h-3 spinner"></i> 生成中...`;
@@ -251,8 +255,6 @@ export class TimeTraceViewer {
         canvas.height = height;
 
         const isHorizontal = this.scannerStage.classList.contains('animate-scan-h');
-        
-        // Mime type check logic...
         let mimeType = 'video/webm'; 
         let ext = 'webm';
         if (MediaRecorder.isTypeSupported('video/mp4;codecs=avc1.42E01E,mp4a.40.2')) {
@@ -281,25 +283,20 @@ export class TimeTraceViewer {
             a.href = url;
             a.download = `watermark_removed_${new Date().getTime()}.${ext}`;
             a.click();
-            
             this.btnDownload.innerHTML = originalBtnHtml;
             this.btnDownload.disabled = false;
             lucide.createIcons();
         };
 
         recorder.start();
-        
-        // Animation simulation logic for recording
-        const speed = parseFloat(this.scanSpeed.value);
-        const baseDuration = 4000;
-        const duration = baseDuration / speed;
+        const speed = parseFloat(this.scanSpeed.value || 1);
+        const duration = 4000 / speed;
         const startTime = performance.now();
 
         const drawFrame = (now) => {
             const elapsed = now - startTime;
             let progress = 0;
             const p = elapsed / duration;
-
             if (p <= 0.05) progress = 0;
             else if (p <= 0.60) progress = (p - 0.05) / 0.55;
             else progress = 1;
@@ -348,113 +345,77 @@ export class TimeTraceViewer {
             if (elapsed < duration) requestAnimationFrame(drawFrame);
             else recorder.stop();
         };
-
         requestAnimationFrame(drawFrame);
     }
 
-    // --- Comparison Logic ---
     bindComparisonEvents() {
-        this.btnCopyComp.addEventListener('click', () => this.copyComparison());
-        this.btnDownComp.addEventListener('click', () => this.downloadComparison());
+        if (this.btnCopyComp) this.btnCopyComp.addEventListener('click', () => this.copyComparison());
+        if (this.btnDownComp) this.btnDownComp.addEventListener('click', () => this.downloadComparison());
     }
 
     createComparisonCanvas() {
+        if (!this.previewBefore || !this.previewAfter) return null;
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
-
         const imgWidth = this.previewBefore.naturalWidth;
         const imgHeight = this.previewBefore.naturalHeight;
-        
-        // Scale down if too large to avoid canvas limits
-        // ... (省略部分细节，保持原样)
-
         const gap = Math.max(20, imgWidth * 0.05); 
         const headerHeight = Math.max(80, imgHeight * 0.15); 
         const footerHeight = Math.max(60, imgHeight * 0.1); 
         const padding = Math.max(20, imgWidth * 0.05); 
-
         const totalWidth = (imgWidth * 2) + gap + (padding * 2);
         const totalHeight = imgHeight + headerHeight + footerHeight;
 
         canvas.width = totalWidth;
         canvas.height = totalHeight;
-
         ctx.fillStyle = '#0f172a';
         ctx.fillRect(0, 0, totalWidth, totalHeight);
-
         ctx.drawImage(this.previewBefore, padding, headerHeight, imgWidth, imgHeight);
         ctx.drawImage(this.previewAfter, padding + imgWidth + gap, headerHeight, imgWidth, imgHeight);
 
         const drawLabel = (text, x, y, color) => {
-            ctx.font = `bold ${Math.max(24, imgHeight * 0.04)}px "Microsoft YaHei", sans-serif`;
+            ctx.font = `bold ${Math.max(24, imgHeight * 0.04)}px sans-serif`;
             const metrics = ctx.measureText(text);
             const bgWidth = metrics.width + 40;
             const bgHeight = Math.max(40, imgHeight * 0.06);
-            
             ctx.fillStyle = color;
-            if (ctx.roundRect) ctx.roundRect(x, y, bgWidth, bgHeight, 8);
-            else ctx.fillRect(x, y, bgWidth, bgHeight);
-            ctx.fill();
-
+            ctx.fillRect(x, y, bgWidth, bgHeight);
             ctx.fillStyle = '#ffffff';
             ctx.textBaseline = 'middle';
             ctx.fillText(text, x + 20, y + (bgHeight / 2));
         }
 
         drawLabel('BEFORE / 原片', padding + 20, headerHeight + 20, 'rgba(0, 0, 0, 0.7)');
-        drawLabel('AFTER / 精修', padding + imgWidth + gap + 20, headerHeight + 20, 'rgba(217, 119, 6, 0.9)');
-
-        ctx.font = `bold ${Math.max(36, imgHeight * 0.06)}px "Microsoft YaHei", sans-serif`;
-        ctx.fillStyle = '#f59e0b';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('Gemini 去水印效果对比', totalWidth / 2, headerHeight / 2);
-
-        ctx.font = `${Math.max(20, imgHeight * 0.03)}px "Microsoft YaHei", sans-serif`;
-        ctx.fillStyle = '#64748b';
-        ctx.fillText('Generated by Gemini Watermark Remover', totalWidth / 2, totalHeight - (footerHeight / 2));
-
+        drawLabel('AFTER / 精修', padding + imgWidth + gap + 20, headerHeight + 20, 'rgba(16, 185, 129, 0.9)');
         return canvas;
     }
 
     copyComparison() {
+        if (!this.btnCopyComp) return;
         const originalHtml = this.btnCopyComp.innerHTML;
         this.btnCopyComp.innerHTML = `<i data-lucide="loader" class="w-3 h-3 spinner"></i> 生成中...`;
         lucide.createIcons();
-
         setTimeout(() => {
             const canvas = this.createComparisonCanvas();
             if (!canvas) return;
-
             canvas.toBlob(blob => {
                 if (navigator.clipboard && navigator.clipboard.write) {
                     const item = new ClipboardItem({ 'image/png': blob });
-                    navigator.clipboard.write([item])
-                        .then(() => {
-                            this.btnCopyComp.innerHTML = `<i data-lucide="check" class="w-3 h-3"></i> 已复制!`;
-                            this.btnCopyComp.classList.add('text-green-400', 'border-green-400');
-                            lucide.createIcons();
-                            setTimeout(() => {
-                                this.btnCopyComp.innerHTML = originalHtml;
-                                this.btnCopyComp.classList.remove('text-green-400', 'border-green-400');
-                                lucide.createIcons();
-                            }, 2000);
-                        })
-                        .catch(err => {
-                            console.error(err);
-                            this.btnCopyComp.innerHTML = `<i data-lucide="x" class="w-3 h-3"></i> 失败`;
-                            lucide.createIcons();
-                        });
+                    navigator.clipboard.write([item]).then(() => {
+                        this.btnCopyComp.innerHTML = `<i data-lucide="check" class="w-3 h-3"></i> 已复制!`;
+                        lucide.createIcons();
+                        setTimeout(() => { this.btnCopyComp.innerHTML = originalHtml; lucide.createIcons(); }, 2000);
+                    });
                 }
             }, 'image/png');
         }, 50);
     }
 
     downloadComparison() {
+        if (!this.btnDownComp) return;
         const originalHtml = this.btnDownComp.innerHTML;
         this.btnDownComp.innerHTML = `<i data-lucide="loader" class="w-3 h-3 spinner"></i> 下载中...`;
         lucide.createIcons();
-
         setTimeout(() => {
             const canvas = this.createComparisonCanvas();
             if (canvas) {
