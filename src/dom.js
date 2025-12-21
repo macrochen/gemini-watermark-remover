@@ -32,6 +32,28 @@ export const elements = {
     startBtnContainer: document.getElementById('startBtnContainer'),
     startProcessBtn: document.getElementById('startProcessBtn'),
     
+    // Navigation
+    navProjectBtn: document.getElementById('navProjectBtn'),
+    navToolBtn: document.getElementById('navToolBtn'),
+    projectControls: document.getElementById('projectControls'),
+    sidebarTree: document.getElementById('sidebarTree'),
+    
+    // Views
+    projectView: document.getElementById('projectView'),
+    toolsView: document.getElementById('toolsView'),
+    
+    // Batch Tool
+    batchDropZone: document.getElementById('batchDropZone'),
+    batchInput: document.getElementById('batchInput'),
+    batchList: document.getElementById('batchList'),
+    batchClearBtn: document.getElementById('batchClearBtn'),
+
+    // Quick Preview
+    quickPreviewModal: document.getElementById('quickPreviewModal'),
+    closeQuickPreview: document.getElementById('closeQuickPreview'),
+    quickPreviewStage: document.getElementById('quickPreviewStage'),
+    quickTimeTraceContainer: document.getElementById('quickTimeTraceContainer'),
+
     // Preview Thumbs
     previewThumbOriginal: document.getElementById('previewThumbOriginal'),
     statusOriginal: document.getElementById('statusOriginal'),

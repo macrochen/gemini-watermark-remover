@@ -7,6 +7,7 @@ import { startPendingSession, reprocessCurrentSession, resetToHome, loadProject 
 import { setupDropZones } from './modules/importer.js';
 import { openSaveModal, confirmSave, switchSaveTab } from './modules/saver.js';
 import { handleExportImage, handleExportVideo } from './modules/exporter.js';
+import { setupQuickTool } from './modules/quickTool.js';
 
 async function init() {
     try {
@@ -40,6 +41,9 @@ function setupEventListeners() {
     // Importer
     setupDropZones();
     elements.startProcessBtn.addEventListener('click', startPendingSession);
+
+    // Quick Tool
+    setupQuickTool();
 }
 
 async function mountWorkplace() {

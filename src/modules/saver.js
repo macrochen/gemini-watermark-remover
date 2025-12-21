@@ -105,6 +105,12 @@ export async function confirmSave() {
         const projHandle = await context.fs.getProjectDirectory(userName, projectName);
         
         await context.fs.saveFileToProject(projHandle, 'original.png', context.session.originalBlob);
+        
+        // Save the raw watermarked retouched image (Backup)
+        if (context.session.rawRetouchedBlob) {
+            await context.fs.saveFileToProject(projHandle, 'retouched.png', context.session.rawRetouchedBlob);
+        }
+        
         await context.fs.saveFileToProject(projHandle, 'clean.png', context.session.cleanBlob);
         
         elements.saveModal.classList.add('hidden');

@@ -1,47 +1,47 @@
 export class TimeTraceViewer {
-    constructor() {
+    constructor(containerId = 'timeTraceContainer') {
         this.beforeImg = null;
         this.afterImgUrl = null;
-        
-        // State
         this.lastCursorX = 0;
         this.lastCursorY = 0;
         this.isCursorInside = false;
         
-        // Elements
-        this.container = document.getElementById('timeTraceContainer');
-        this.zoomSection = document.getElementById('zoomSection');
-        this.scanSection = document.getElementById('scanSection');
-        this.comparisonSection = document.getElementById('comparisonSection');
+        this.containerId = containerId;
+        this.container = document.getElementById(containerId);
         
-        // Zoom Elements
-        this.beforeImgEl = document.getElementById('beforeImg');
-        this.zoomResult = document.getElementById('zoomResult');
-        this.zoomLens = document.getElementById('zoomLens');
-        this.imgContainer = document.getElementById('imgContainer');
-        this.lensSizeSlider = document.getElementById('lensSizeSlider');
-        this.zoomLevelDisplay = document.getElementById('zoomLevelDisplay');
-        this.resultHint = document.querySelector('.result-hint');
-        
-        // Scanner Elements
-        this.scannerStage = document.getElementById('scannerStage');
-        this.scanBefore = document.getElementById('scanBefore');
-        this.scanAfter = document.getElementById('scanAfter');
-        this.btnPause = document.getElementById('btnPause');
-        this.btnDownload = document.getElementById('btnDownload');
-        this.scanSpeed = document.getElementById('scanSpeed');
-        
-        // Comparison Elements
-        this.previewBefore = document.getElementById('previewBefore');
-        this.previewAfter = document.getElementById('previewAfter');
-        this.btnCopyComp = document.getElementById('btnCopyComp');
-        this.btnDownComp = document.getElementById('btnDownComp');
+        // If we are in 'quick' mode (modal), we expect elements to have IDs like 'quick-zoomSection'.
+        this.prefix = containerId === 'timeTraceContainer' ? '' : 'quick-';
 
         this.init();
     }
 
     init() {
         if (!this.container) return; 
+        
+        // Re-query elements based on prefix
+        this.zoomSection = document.getElementById(this.prefix + 'zoomSection');
+        this.scanSection = document.getElementById(this.prefix + 'scanSection');
+        this.comparisonSection = document.getElementById(this.prefix + 'comparisonSection');
+        
+        this.beforeImgEl = document.getElementById(this.prefix + 'beforeImg');
+        this.zoomResult = document.getElementById(this.prefix + 'zoomResult');
+        this.zoomLens = document.getElementById(this.prefix + 'zoomLens');
+        this.imgContainer = document.getElementById(this.prefix + 'imgContainer');
+        this.lensSizeSlider = document.getElementById(this.prefix + 'lensSizeSlider');
+        this.zoomLevelDisplay = document.getElementById(this.prefix + 'zoomLevelDisplay');
+        this.resultHint = this.container.querySelector('.result-hint');
+        
+        this.scannerStage = document.getElementById(this.prefix + 'scannerStage');
+        this.scanBefore = document.getElementById(this.prefix + 'scanBefore');
+        this.scanAfter = document.getElementById(this.prefix + 'scanAfter');
+        this.btnPause = document.getElementById(this.prefix + 'btnPause');
+        this.btnDownload = document.getElementById(this.prefix + 'btnDownload');
+        this.scanSpeed = document.getElementById(this.prefix + 'scanSpeed');
+        
+        this.previewBefore = document.getElementById(this.prefix + 'previewBefore');
+        this.previewAfter = document.getElementById(this.prefix + 'previewAfter');
+        this.btnCopyComp = document.getElementById(this.prefix + 'btnCopyComp');
+        this.btnDownComp = document.getElementById(this.prefix + 'btnDownComp');
 
         this.bindZoomEvents();
         this.bindScannerEvents();
@@ -55,7 +55,10 @@ export class TimeTraceViewer {
         this.container.style.display = 'block';
         const processedUrl = URL.createObjectURL(processedBlob);
         this.updateImages(originalImgSrc, processedUrl);
-        this.container.scrollIntoView({ behavior: 'smooth' });
+        // Only scroll if it's the main container (not modal)
+        if (this.containerId === 'timeTraceContainer') {
+            this.container.scrollIntoView({ behavior: 'smooth' });
+        }
     }
 
     updateImages(originalSrc, processedUrl) {
@@ -183,8 +186,8 @@ export class TimeTraceViewer {
         if (this.btnPause) this.btnPause.addEventListener('click', () => this.toggleScanPause());
         if (this.scanSpeed) this.scanSpeed.addEventListener('change', () => this.updateScanSpeed());
         
-        const btnH = document.getElementById('scanDirH');
-        const btnV = document.getElementById('scanDirV');
+        const btnH = document.getElementById(this.prefix + 'scanDirH');
+        const btnV = document.getElementById(this.prefix + 'scanDirV');
         if (btnH) btnH.addEventListener('click', () => this.forceScanDirection('h'));
         if (btnV) btnV.addEventListener('click', () => this.forceScanDirection('v'));
         

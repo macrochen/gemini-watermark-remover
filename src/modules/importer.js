@@ -2,6 +2,7 @@ import { context } from '../context.js';
 import { elements } from '../dom.js';
 import { showLoading, hideLoading, loadImage, canvasToBlob } from '../utils.js';
 import { displaySession } from './session.js';
+import { addFiles as addToQuickTool } from './quickTool.js';
 
 export function setupDropZones() {
     setupDropZone(elements.dropZoneOriginal, elements.inputOriginal, 'original');
@@ -82,6 +83,13 @@ async function handlePaste(e) {
 
     if (!pastedBlob) return;
 
+    // SCENARIO 0: Quick Tool View
+    if (elements.toolsView && !elements.toolsView.classList.contains('hidden')) {
+        addToQuickTool([pastedBlob]);
+        return;
+    }
+
+    // SCENARIO 1: On Welcome Page
     if (elements.welcomePage.style.display !== 'none') {
         if (!context.pendingImport.original) {
             setPendingFile('original', pastedBlob);
@@ -91,6 +99,7 @@ async function handlePaste(e) {
         return;
     }
 
+    // SCENARIO 2: In Active Session (Hot Replace)
     if (context.session.originalBlob) {
         if (confirm('检测到粘贴图片，是否将其作为【新的精修图】替换当前画面？')) {
             showLoading();

@@ -116,11 +116,22 @@ export async function loadProject(userName, project) {
     try {
         const originalUrl = await context.fs.loadFileAsDataURL(project.handle, 'original.png');
         const cleanDataUrl = await context.fs.loadFileAsDataURL(project.handle, 'clean.png');
+        // Try load raw retouched (might not exist for old projects)
+        const retouchedUrl = await context.fs.loadFileAsDataURL(project.handle, 'retouched.png');
         
         if (!originalUrl || !cleanDataUrl) throw new Error('Files missing (original.png or clean.png)');
 
         const cleanBlob = await (await fetch(cleanDataUrl)).blob();
         const originalBlob = await (await fetch(originalUrl)).blob();
+        let rawRetouchedBlob = null;
+        
+        if (retouchedUrl) {
+            rawRetouchedBlob = await (await fetch(retouchedUrl)).blob();
+        } else {
+            // Fallback: If no retouched.png exists (legacy), assume clean is the best we have,
+            // or we just don't support re-toggling on legacy projects.
+            // Let's leave it null.
+        }
 
         context.session = {
             ...context.session,
@@ -130,6 +141,7 @@ export async function loadProject(userName, project) {
             cleanUrl: cleanDataUrl,
             cleanBlob,
             originalBlob,
+            rawRetouchedBlob,
             isNew: false
         };
 
