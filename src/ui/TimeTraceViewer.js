@@ -236,116 +236,113 @@ export class TimeTraceViewer {
     }
 
     generateVideo() {
-        if (typeof MediaRecorder === 'undefined') {
-            alert("您的浏览器不支持视频录制功能。");
-            return;
-        }
-        if (!this.scanBefore || !this.scanAfter || !this.btnDownload) return;
+        return new Promise((resolve, reject) => {
+            if (typeof MediaRecorder === 'undefined') {
+                alert("您的浏览器不支持视频录制功能。");
+                reject(new Error("MediaRecorder not supported"));
+                return;
+            }
+            if (!this.scanBefore || !this.scanAfter) {
+                reject(new Error("Images not loaded"));
+                return;
+            }
 
-        const originalBtnHtml = this.btnDownload.innerHTML;
-        this.btnDownload.innerHTML = `<i data-lucide="loader" class="w-3 h-3 spinner"></i> 生成中...`;
-        this.btnDownload.disabled = true;
-        lucide.createIcons();
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const width = this.scanBefore.naturalWidth;
+            const height = this.scanBefore.naturalHeight;
+            canvas.width = width;
+            canvas.height = height;
 
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        const width = this.scanBefore.naturalWidth;
-        const height = this.scanBefore.naturalHeight;
-        canvas.width = width;
-        canvas.height = height;
+            const isHorizontal = this.scannerStage && this.scannerStage.classList.contains('animate-scan-h');
+            let mimeType = 'video/webm'; 
+            
+            if (MediaRecorder.isTypeSupported('video/mp4;codecs=avc1.42E01E,mp4a.40.2')) {
+                mimeType = 'video/mp4;codecs=avc1.42E01E,mp4a.40.2';
+            } else if (MediaRecorder.isTypeSupported('video/mp4')) {
+                mimeType = 'video/mp4';
+            }
 
-        const isHorizontal = this.scannerStage.classList.contains('animate-scan-h');
-        let mimeType = 'video/webm'; 
-        let ext = 'webm';
-        if (MediaRecorder.isTypeSupported('video/mp4;codecs=avc1.42E01E,mp4a.40.2')) {
-            mimeType = 'video/mp4;codecs=avc1.42E01E,mp4a.40.2';
-            ext = 'mp4';
-        } else if (MediaRecorder.isTypeSupported('video/mp4')) {
-            mimeType = 'video/mp4';
-            ext = 'mp4';
-        }
-
-        let recorder;
-        try {
-            const stream = canvas.captureStream(30);
-            recorder = new MediaRecorder(stream, { mimeType });
-        } catch (e) {
-            recorder = new MediaRecorder(canvas.captureStream(30));
-            ext = 'webm';
-        }
-
-        const chunks = [];
-        recorder.ondataavailable = e => chunks.push(e.data);
-        recorder.onstop = () => {
-            const blob = new Blob(chunks, { type: mimeType.split(';')[0] });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `watermark_removed_${new Date().getTime()}.${ext}`;
-            a.click();
-            this.btnDownload.innerHTML = originalBtnHtml;
-            this.btnDownload.disabled = false;
-            lucide.createIcons();
-        };
-
-        recorder.start();
-        const speed = parseFloat(this.scanSpeed.value || 1);
-        const duration = 4000 / speed;
-        const startTime = performance.now();
-
-        const drawFrame = (now) => {
-            const elapsed = now - startTime;
-            let progress = 0;
-            const p = elapsed / duration;
-            if (p <= 0.05) progress = 0;
-            else if (p <= 0.60) progress = (p - 0.05) / 0.55;
-            else progress = 1;
-
-            ctx.clearRect(0, 0, width, height);
-            ctx.drawImage(this.scanBefore, 0, 0, width, height);
-
-            if (isHorizontal) {
-                const w = width * progress;
-                if (w > 0) {
-                    ctx.save();
-                    ctx.beginPath();
-                    ctx.rect(0, 0, w, height);
-                    ctx.clip();
-                    ctx.drawImage(this.scanAfter, 0, 0, width, height);
-                    ctx.restore();
-                    if (progress < 1 && progress > 0) {
-                        ctx.beginPath();
-                        ctx.moveTo(w, 0);
-                        ctx.lineTo(w, height);
-                        ctx.lineWidth = 4 * (width / 800);
-                        ctx.strokeStyle = '#f59e0b';
-                        ctx.stroke();
-                    }
-                }
-            } else {
-                const h = height * progress;
-                if (h > 0) {
-                    ctx.save();
-                    ctx.beginPath();
-                    ctx.rect(0, 0, width, h);
-                    ctx.clip();
-                    ctx.drawImage(this.scanAfter, 0, 0, width, height);
-                    ctx.restore();
-                    if (progress < 1 && progress > 0) {
-                        ctx.beginPath();
-                        ctx.moveTo(0, h);
-                        ctx.lineTo(width, h);
-                        ctx.lineWidth = 4 * (height / 800);
-                        ctx.strokeStyle = '#f59e0b';
-                        ctx.stroke();
-                    }
+            let recorder;
+            try {
+                const stream = canvas.captureStream(30);
+                recorder = new MediaRecorder(stream, { mimeType });
+            } catch (e) {
+                try {
+                    recorder = new MediaRecorder(canvas.captureStream(30));
+                } catch (err) {
+                    reject(err);
+                    return;
                 }
             }
 
-            if (elapsed < duration) requestAnimationFrame(drawFrame);
-            else recorder.stop();
-        };
-        requestAnimationFrame(drawFrame);
+            const chunks = [];
+            recorder.ondataavailable = e => chunks.push(e.data);
+            recorder.onstop = () => {
+                const blob = new Blob(chunks, { type: mimeType.split(';')[0] });
+                resolve({ blob, ext: mimeType.includes('mp4') ? 'mp4' : 'webm' });
+            };
+
+            recorder.start();
+            const speed = parseFloat(this.scanSpeed ? this.scanSpeed.value : 1);
+            const duration = 4000 / speed;
+            const startTime = performance.now();
+
+            const drawFrame = (now) => {
+                const elapsed = now - startTime;
+                let progress = 0;
+                const p = elapsed / duration;
+                
+                if (p <= 0.05) progress = 0;
+                else if (p <= 0.60) progress = (p - 0.05) / 0.55;
+                else progress = 1;
+
+                ctx.clearRect(0, 0, width, height);
+                ctx.drawImage(this.scanBefore, 0, 0, width, height);
+
+                if (isHorizontal) {
+                    const w = width * progress;
+                    if (w > 0) {
+                        ctx.save();
+                        ctx.beginPath();
+                        ctx.rect(0, 0, w, height);
+                        ctx.clip();
+                        ctx.drawImage(this.scanAfter, 0, 0, width, height);
+                        ctx.restore();
+                        if (progress < 1 && progress > 0) {
+                            ctx.beginPath();
+                            ctx.moveTo(w, 0);
+                            ctx.lineTo(w, height);
+                            ctx.lineWidth = 4 * (width / 800);
+                            ctx.strokeStyle = '#f59e0b';
+                            ctx.stroke();
+                        }
+                    }
+                } else {
+                    const h = height * progress;
+                    if (h > 0) {
+                        ctx.save();
+                        ctx.beginPath();
+                        ctx.rect(0, 0, width, h);
+                        ctx.clip();
+                        ctx.drawImage(this.scanAfter, 0, 0, width, height);
+                        ctx.restore();
+                        if (progress < 1 && progress > 0) {
+                            ctx.beginPath();
+                            ctx.moveTo(0, h);
+                            ctx.lineTo(width, h);
+                            ctx.lineWidth = 4 * (height / 800);
+                            ctx.strokeStyle = '#f59e0b';
+                            ctx.stroke();
+                        }
+                    }
+                }
+
+                if (elapsed < duration) requestAnimationFrame(drawFrame);
+                else recorder.stop();
+            };
+            requestAnimationFrame(drawFrame);
+        });
     }
 
     bindComparisonEvents() {
