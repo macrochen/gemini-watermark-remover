@@ -1,301 +1,342 @@
 import { WatermarkEngine } from './core/watermarkEngine.js';
-import i18n from './i18n.js';
-import JSZip from 'jszip';
+import { FileSystemManager } from './core/FileSystemManager.js';
+import { Sidebar } from './ui/Sidebar.js';
+import { TimeTraceViewer } from './ui/TimeTraceViewer.js';
 
-// global state
+// App State
 let engine = null;
-let imageQueue = [];
-let processedCount = 0;
+let fs = new FileSystemManager();
+let sidebar = null;
+let viewer = new TimeTraceViewer();
 
-// dom elements references
-const uploadArea = document.getElementById('uploadArea');
-const fileInput = document.getElementById('fileInput');
-const singlePreview = document.getElementById('singlePreview');
-const multiPreview = document.getElementById('multiPreview');
-const imageList = document.getElementById('imageList');
-const progressText = document.getElementById('progressText');
-const downloadAllBtn = document.getElementById('downloadAllBtn');
-const loadingOverlay = document.getElementById('loadingOverlay');
-const originalCanvas = document.getElementById('originalCanvas');
-const processedSection = document.getElementById('processedSection');
-const processedImage = document.getElementById('processedImage');
-const originalInfo = document.getElementById('originalInfo');
-const processedInfo = document.getElementById('processedInfo');
-const downloadBtn = document.getElementById('downloadBtn');
-const resetBtn = document.getElementById('resetBtn');
-const statusMessage = document.getElementById('statusMessage');
+let currentSession = {
+    userName: '',
+    projectName: '',
+    originalBlob: null,
+    cleanBlob: null,
+    isNew: true // true if it's a fresh import, false if loaded from disk
+};
+
+// DOM elements
+const mountBtn = document.getElementById('mountBtn');
+const workplacePath = document.getElementById('workplacePath');
+const saveBtn = document.getElementById('saveBtn');
+const exportBtn = document.getElementById('exportBtn');
+const welcomePage = document.getElementById('welcomePage');
+const stageContainer = document.getElementById('stageContainer');
+const activeProjectLabel = document.getElementById('activeProjectLabel');
+const saveModal = document.getElementById('saveModal');
+const dropZone = document.getElementById('dropZone');
 
 /**
- * initialize the application
+ * Initialize the App
  */
 async function init() {
     try {
-        await i18n.init();
-        setupLanguageSwitch();
-        showLoading(i18n.t('status.loading'));
-
         engine = await WatermarkEngine.create();
-
-        hideLoading();
+        sidebar = new Sidebar('sidebarTree', loadProject);
+        
         setupEventListeners();
-    } catch (error) {
-        hideLoading();
-        console.error('初始化错误：', error);
+        lucide.createIcons();
+    } catch (err) {
+        console.error('Initialization failed:', err);
     }
 }
 
 /**
- * setup language switch
- */
-function setupLanguageSwitch() {
-    const btn = document.getElementById('langSwitch');
-    btn.textContent = i18n.locale === 'zh-CN' ? 'EN' : '中文';
-    btn.addEventListener('click', async () => {
-        const newLocale = i18n.locale === 'zh-CN' ? 'en-US' : 'zh-CN';
-        await i18n.switchLocale(newLocale);
-        btn.textContent = newLocale === 'zh-CN' ? 'EN' : '中文';
-        updateDynamicTexts();
-    });
-}
-
-/**
- * setup event listeners
+ * Global event listeners
  */
 function setupEventListeners() {
-    uploadArea.addEventListener('click', () => fileInput.click());
-    fileInput.addEventListener('change', handleFileSelect);
+    mountBtn.addEventListener('click', mountWorkplace);
+    saveBtn.addEventListener('click', openSaveModal);
+    exportBtn.addEventListener('click', handleExport);
+    
+    // Save Modal
+    document.getElementById('cancelSave').addEventListener('click', () => saveModal.classList.add('hidden'));
+    document.getElementById('confirmSave').addEventListener('click', confirmSave);
 
-    uploadArea.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        uploadArea.classList.add('dragover');
+    // Drop Zone
+    dropZone.addEventListener('click', () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.multiple = true;
+        input.accept = 'image/*';
+        input.onchange = (e) => handleFiles(Array.from(e.target.files));
+        input.click();
     });
 
-    uploadArea.addEventListener('dragleave', () => {
-        uploadArea.classList.remove('dragover');
-    });
-
-    uploadArea.addEventListener('drop', (e) => {
+    document.addEventListener('dragover', (e) => e.preventDefault());
+    document.addEventListener('drop', (e) => {
         e.preventDefault();
-        uploadArea.classList.remove('dragover');
         handleFiles(Array.from(e.dataTransfer.files));
     });
 
-    downloadAllBtn.addEventListener('click', downloadAll);
-    resetBtn.addEventListener('click', reset);
+    // Paste handling
+    document.addEventListener('paste', handlePaste);
 }
 
-function reset() {
-    singlePreview.style.display = 'none';
-    multiPreview.style.display = 'none';
-    imageQueue = [];
-    processedCount = 0;
-    fileInput.value = '';
-}
-
-function handleFileSelect(e) {
-    handleFiles(Array.from(e.target.files));
-}
-
-function handleFiles(files) {
-    const validFiles = files.filter(file => {
-        if (!file.type.match('image/(jpeg|png|webp)')) return false;
-        if (file.size > 20 * 1024 * 1024) return false;
-        return true;
-    });
-
-    if (validFiles.length === 0) return;
-
-    imageQueue = validFiles.map((file, index) => ({
-        id: Date.now() + index,
-        file,
-        name: file.name,
-        status: 'pending',
-        originalImg: null,
-        processedBlob: null
-    }));
-
-    processedCount = 0;
-
-    if (validFiles.length === 1) {
-        singlePreview.style.display = 'block';
-        multiPreview.style.display = 'none';
-        processSingle(imageQueue[0]);
-    } else {
-        singlePreview.style.display = 'none';
-        multiPreview.style.display = 'block';
-        imageList.innerHTML = '';
-        updateProgress();
-        multiPreview.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        imageQueue.forEach(item => createImageCard(item));
-        processQueue();
+/**
+ * Mount workspace and sync tree
+ */
+async function mountWorkplace() {
+    const handle = await fs.mountWorkspace();
+    if (handle) {
+        workplacePath.textContent = handle.name;
+        updateSidebar();
     }
 }
 
-async function processSingle(item) {
+async function updateSidebar() {
+    const tree = await fs.refreshTree();
+    sidebar.render(tree);
+    
+    // Update user datalist for autocomplete
+    const datalist = document.getElementById('userList');
+    datalist.innerHTML = tree.map(u => `<option value="${u.name}">`).join('');
+}
+
+/**
+ * File processing logic
+ */
+async function handleFiles(files) {
+    let original = files.find(f => f.name.toLowerCase().includes('original')) || files[0];
+    let retouched = files.find(f => f.name.toLowerCase().includes('retouched')) || files[1] || files[0];
+
+    if (!original) return;
+
+    showLoading();
     try {
-        const img = await loadImage(item.file);
-        item.originalImg = img;
+        const originalImg = await loadImage(original);
+        const retouchedImg = await loadImage(retouched);
+        
+        // Auto-Dewatermark the retouched image
+        const resultCanvas = await engine.removeWatermarkFromImage(retouchedImg);
+        const cleanBlob = await canvasToBlob(resultCanvas);
 
-        originalCanvas.width = img.width;
-        originalCanvas.height = img.height;
-        originalCanvas.getContext('2d').drawImage(img, 0, 0);
+        currentSession = {
+            originalBlob: original,
+            cleanBlob: cleanBlob,
+            originalUrl: URL.createObjectURL(original),
+            cleanUrl: URL.createObjectURL(cleanBlob),
+            isNew: true
+        };
 
-        // update original image info
-        const watermarkInfo = engine.getWatermarkInfo(img.width, img.height);
-        originalInfo.innerHTML = `
-            <strong>${i18n.t('info.size')}：</strong>${img.width} × ${img.height} px<br>
-            <strong>${i18n.t('info.watermark')}：</strong>${watermarkInfo.size}×${watermarkInfo.size} px<br>
-            <strong>${i18n.t('info.position')}：</strong>(${watermarkInfo.position.x}, ${watermarkInfo.position.y})
-        `;
-
-        const result = await engine.removeWatermarkFromImage(img);
-        const blob = await new Promise(resolve => result.toBlob(resolve, 'image/png'));
-        item.processedBlob = blob;
-
-        processedImage.src = URL.createObjectURL(blob);
-        processedSection.style.display = 'block';
-        downloadBtn.style.display = 'flex';
-        downloadBtn.onclick = () => downloadImage(item);
-
-        processedInfo.innerHTML = `
-            <strong>${i18n.t('info.size')}：</strong>${img.width} × ${img.height} px<br>
-            <strong>${i18n.t('info.status')}：</strong>${i18n.t('info.removed')}
-        `;
-
-        processedSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    } catch (error) {
-        console.error(error);
+        displaySession();
+    } catch (err) {
+        console.error('Processing failed:', err);
+    } finally {
+        hideLoading();
     }
 }
 
-function createImageCard(item) {
-    const card = document.createElement('div');
-    card.id = `card-${item.id}`;
-    card.className = 'bg-white md:h-[130px] rounded-xl shadow-card border border-gray-100 overflow-hidden';
-    card.innerHTML = `
-        <div class="flex flex-wrap h-full relative">
-            <div class="w-full md:w-auto h-full flex">
-                <div class="w-24 md:w-48 flex-shrink-0 bg-gray-50 p-2 flex items-center justify-center">
-                    <img id="result-${item.id}" class="max-w-full max-h-full rounded"></img>
-                </div>
-                <div class="flex-1 p-4 flex flex-col min-w-0">
-                    <h4 class="font-semibold text-gray-900 mb-2 truncate">${item.name}</h4>
-                    <div class="text-xs text-gray-500" id="status-${item.id}">${i18n.t('status.pending')}</div>
-                </div>
-            </div>
-            <div class="absolute bottom-0 right-0 md:static w-auto ml-auto flex-shrink-0 p-2 md:p-4 flex items-center justify-center">
-                <button id="download-${item.id}" class="px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white rounded-lg text-sm hidden">${i18n.t('btn.download')}</button>
-            </div>
-        </div>
-    `;
-    imageList.appendChild(card);
-}
+/**
+ * Paste handling - logic for smart replacement
+ */
+async function handlePaste(e) {
+    const items = e.clipboardData.items;
+    for (const item of items) {
+        if (item.type.indexOf('image') !== -1) {
+            const blob = item.getAsFile();
+            showLoading();
+            try {
+                const img = await loadImage(blob);
+                const resultCanvas = await engine.removeWatermarkFromImage(img);
+                const cleanBlob = await canvasToBlob(resultCanvas);
 
-async function processQueue() {
-    for (const item of imageQueue) {
-        const img = await loadImage(item.file);
-        item.originalImg = img;
-        document.getElementById(`result-${item.id}`).src = img.src;
-    }
+                if (!currentSession.originalBlob) {
+                    // If no original, treat this paste as BOTH original and retouched for preview
+                    currentSession.originalBlob = blob;
+                    currentSession.originalUrl = URL.createObjectURL(blob);
+                }
 
-    for (const item of imageQueue) {
-        if (item.status !== 'pending') continue;
+                currentSession.cleanBlob = cleanBlob;
+                currentSession.cleanUrl = URL.createObjectURL(cleanBlob);
+                currentSession.isNew = true;
 
-        item.status = 'processing';
-        updateStatus(item.id, i18n.t('status.processing'));
-
-        try {
-            const result = await engine.removeWatermarkFromImage(item.originalImg);
-            const blob = await new Promise(resolve => result.toBlob(resolve, 'image/png'));
-            item.processedBlob = blob;
-
-            document.getElementById(`result-${item.id}`).src = URL.createObjectURL(blob);
-
-            item.status = 'completed';
-            const watermarkInfo = engine.getWatermarkInfo(item.originalImg.width, item.originalImg.height);
-            updateStatus(item.id, `<strong>${i18n.t('info.size')}：</strong>${item.originalImg.width} × ${item.originalImg.height} px<br>
-            <strong>${i18n.t('info.watermark')}：</strong>${watermarkInfo.size}×${watermarkInfo.size} px<br>
-            <strong>${i18n.t('info.position')}：</strong>(${watermarkInfo.position.x}, ${watermarkInfo.position.y})`, true);
-
-            const downloadBtn = document.getElementById(`download-${item.id}`);
-            downloadBtn.classList.remove('hidden');
-            downloadBtn.onclick = () => downloadImage(item);
-
-            processedCount++;
-            updateProgress();
-        } catch (error) {
-            item.status = 'error';
-            updateStatus(item.id, i18n.t('status.failed'));
-            console.error(error);
+                displaySession();
+            } catch (err) {
+                console.error('Paste processing failed:', err);
+            } finally {
+                hideLoading();
+            }
+            break; 
         }
     }
+}
 
-    if (processedCount > 0) {
-        downloadAllBtn.style.display = 'flex';
+/**
+ * UI Sync
+ */
+function displaySession() {
+    welcomePage.style.display = 'none';
+    stageContainer.style.display = 'block';
+    
+    viewer.show(currentSession.originalUrl, currentSession.cleanBlob);
+    
+    saveBtn.disabled = false;
+    exportBtn.disabled = false;
+    
+    activeProjectLabel.textContent = currentSession.isNew ? 
+        '待归档项目' : 
+        `${currentSession.userName} / ${currentSession.projectName}`;
+}
+
+/**
+ * Persistence
+ */
+function openSaveModal() {
+    if (!currentSession.cleanBlob) return;
+    
+    const now = new Date();
+    const timestamp = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
+    
+    document.getElementById('saveProjectName').value = timestamp;
+    saveModal.classList.remove('hidden');
+}
+
+async function confirmSave() {
+    const userName = document.getElementById('saveUser').value.trim();
+    const projectName = document.getElementById('saveProjectName').value.trim();
+    
+    if (!userName || !projectName) {
+        alert('请输入用户名称和项目名称');
+        return;
+    }
+
+    if (!await fs.verifyPermission()) {
+        alert('工作目录权限受限');
+        return;
+    }
+
+    showLoading();
+    try {
+        const projHandle = await fs.getProjectDirectory(userName, projectName);
+        
+        // Save original and clean
+        await fs.saveFileToProject(projHandle, 'original.png', currentSession.originalBlob);
+        await fs.saveFileToProject(projHandle, 'clean.png', currentSession.cleanBlob);
+        
+        saveModal.classList.add('hidden');
+        currentSession.userName = userName;
+        currentSession.projectName = projectName;
+        currentSession.isNew = false;
+        
+        await updateSidebar();
+        displaySession();
+    } catch (err) {
+        console.error('Save failed:', err);
+        alert('保存失败，请检查磁盘权限');
+    } finally {
+        hideLoading();
     }
 }
 
-function loadImage(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const img = new Image();
-            img.onload = () => resolve(img);
-            img.onerror = reject;
-            img.src = e.target.result;
+/**
+ * Loading from sidebar
+ */
+async function loadProject(userName, project) {
+    showLoading();
+    try {
+        const originalUrl = await fs.loadFileAsDataURL(project.handle, 'original.png');
+        const cleanDataUrl = await fs.loadFileAsDataURL(project.handle, 'clean.png');
+        
+        if (!originalUrl || !cleanDataUrl) throw new Error('Files missing in project');
+
+        const cleanBlob = await (await fetch(cleanDataUrl)).blob();
+
+        currentSession = {
+            userName,
+            projectName: project.name,
+            originalUrl,
+            cleanUrl: cleanDataUrl,
+            cleanBlob,
+            originalBlob: await (await fetch(originalUrl)).blob(),
+            isNew: false
         };
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-    });
-}
 
-function updateStatus(id, text, isHtml = false) {
-    const el = document.getElementById(`status-${id}`);
-    if (el) el.innerHTML = isHtml ? text : text.replace(/\n/g, '<br>');
-}
-
-function updateProgress() {
-    progressText.textContent = `${i18n.t('progress.text')}: ${processedCount}/${imageQueue.length}`;
-}
-
-function updateDynamicTexts() {
-    if (progressText.textContent) {
-        updateProgress();
+        displaySession();
+    } catch (err) {
+        console.error('Load failed:', err);
+        alert('加载失败，文件可能已损坏');
+    } finally {
+        hideLoading();
     }
 }
 
-function downloadImage(item) {
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(item.processedBlob);
-    a.download = `unwatermarked_${item.name.replace(/\.[^.]+$/, '')}.png`;
-    a.click();
+/**
+ * Export Sample Logic
+ */
+async function handleExport() {
+    // Generate small sample (e.g. max 1080px)
+    showLoading();
+    try {
+        // Logic for creating comparison long image or scan video...
+        // For simplicity, let's export current clean image at 1080px height
+        const canvas = await generateExportCanvas(currentSession.cleanUrl, 1080);
+        const blob = await canvasToBlob(canvas, 'image/jpeg', 0.85);
+        
+        const fileName = `preview_${Date.now()}.jpg`;
+        
+        if (!currentSession.isNew && fs.rootHandle) {
+            const userHandle = await fs.rootHandle.getDirectoryHandle(currentSession.userName);
+            const projHandle = await userHandle.getDirectoryHandle(currentSession.projectName);
+            await fs.saveExportFile(projHandle, fileName, blob);
+            alert(`预览图已保存至项目 export 目录：${fileName}`);
+        } else {
+            // If not archived, trigger download
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = fileName;
+            a.click();
+        }
+    } catch (err) {
+        console.error('Export failed:', err);
+    } finally {
+        hideLoading();
+    }
 }
 
-async function downloadAll() {
-    const completed = imageQueue.filter(item => item.status === 'completed');
-    if (completed.length === 0) return;
+async function generateExportCanvas(src, maxHeight) {
+    const img = await loadImage(src);
+    const scale = Math.min(1, maxHeight / img.height);
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width * scale;
+    canvas.height = img.height * scale;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    return canvas;
+}
 
-    const zip = new JSZip();
-    completed.forEach(item => {
-        const filename = `unwatermarked_${item.name.replace(/\.[^.]+$/, '')}.png`;
-        zip.file(filename, item.processedBlob);
+/**
+ * Utils
+ */
+function loadImage(fileOrUrl) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        if (typeof fileOrUrl === 'string') {
+            img.src = fileOrUrl;
+        } else {
+            const reader = new FileReader();
+            reader.onload = (e) => img.src = e.target.result;
+            reader.readAsDataURL(fileOrUrl);
+        }
     });
-
-    const blob = await zip.generateAsync({ type: 'blob' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `unwatermarked_${Date.now()}.zip`;
-    a.click();
 }
 
-function showLoading(text = null) {
-    loadingOverlay.style.display = 'flex';
-    const textEl = loadingOverlay.querySelector('p');
-    if (textEl && text) textEl.textContent = text;
+function canvasToBlob(canvas, type = 'image/png', quality) {
+    return new Promise(resolve => canvas.toBlob(resolve, type, quality));
+}
+
+function showLoading() {
+    document.getElementById('loadingOverlay').classList.remove('hidden');
+    document.getElementById('loadingOverlay').classList.add('flex');
 }
 
 function hideLoading() {
-    loadingOverlay.style.display = 'none';
+    document.getElementById('loadingOverlay').classList.add('hidden');
+    document.getElementById('loadingOverlay').classList.remove('flex');
 }
 
 init();
