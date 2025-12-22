@@ -77,6 +77,7 @@ export function displaySession() {
     elements.saveBtn.disabled = false;
     elements.exportBtn.disabled = false;
     elements.exportVideoBtn.disabled = false;
+    elements.copyBtn.disabled = false;
     
     elements.activeProjectLabel.textContent = context.session.isNew ? 
         '待归档项目' : 
@@ -93,6 +94,7 @@ export function resetToHome() {
     elements.saveBtn.disabled = true;
     elements.exportBtn.disabled = true;
     elements.exportVideoBtn.disabled = true;
+    elements.copyBtn.disabled = true;
     
     if (context.sidebar) context.sidebar.setActive({ classList: { add: () => {}, remove: () => {} } }); 
 }

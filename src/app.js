@@ -6,7 +6,7 @@ import { elements } from './dom.js';
 import { startPendingSession, reprocessCurrentSession, resetToHome, loadProject } from './modules/session.js';
 import { setupDropZones } from './modules/importer.js';
 import { openSaveModal, confirmSave, switchSaveTab } from './modules/saver.js';
-import { handleExportImage, handleExportVideo } from './modules/exporter.js';
+import { handleExportImage, handleExportVideo, handleCopyImage } from './modules/exporter.js';
 import { setupQuickTool } from './modules/quickTool.js';
 
 async function init() {
@@ -27,6 +27,7 @@ function setupEventListeners() {
     elements.newProjectBtn.addEventListener('click', resetToHome);
     elements.saveBtn.addEventListener('click', openSaveModal);
     elements.exportBtn.addEventListener('click', handleExportImage);
+    elements.copyBtn.addEventListener('click', handleCopyImage); // Bind Copy
     elements.exportVideoBtn.addEventListener('click', handleExportVideo);
     
     // Toggle

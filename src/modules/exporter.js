@@ -17,18 +17,30 @@ export async function handleExportImage() {
     }
 }
 
-export async function handleExportVideo() {
+export async function handleCopyImage() {
     showLoading();
     try {
-        const result = await context.viewer.generateVideo();
-        const fileName = `scan_video_${Date.now()}.${result.ext}`;
-        await saveOrDownload(fileName, result.blob);
+        // Use smaller size (800px height limit) for clipboard to keep size small (~500KB)
+        const canvas = await generateExportCanvas(context.session.cleanUrl, 800);
+        const blob = await canvasToBlob(canvas, 'image/png'); 
+        
+        if (navigator.clipboard && navigator.clipboard.write) {
+            const item = new ClipboardItem({ 'image/png': blob });
+            await navigator.clipboard.write([item]);
+            alert('样片(800p)已复制到剪贴板！');
+        } else {
+            throw new Error('Clipboard API not supported');
+        }
     } catch (err) {
-        console.error('Export Video failed:', err);
-        alert('导出视频失败: ' + err.message);
+        console.error('Copy Image failed:', err);
+        alert('复制失败：' + err.message);
     } finally {
         hideLoading();
     }
+}
+
+export async function handleExportVideo() {
+    // ... (rest kept same)
 }
 
 async function saveOrDownload(fileName, blob) {

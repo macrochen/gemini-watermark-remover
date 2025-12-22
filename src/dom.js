@@ -5,6 +5,7 @@ export const elements = {
     saveBtn: document.getElementById('saveBtn'),
     exportBtn: document.getElementById('exportBtn'),
     exportVideoBtn: document.getElementById('exportVideoBtn'),
+    copyBtn: document.getElementById('copyBtn'),
     dewatermarkToggle: document.getElementById('dewatermarkToggle'),
     
     welcomePage: document.getElementById('welcomePage'),
