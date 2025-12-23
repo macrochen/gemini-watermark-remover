@@ -98,7 +98,11 @@ async function build() {
   console.log('Copying: src/i18n -> dist/i18n');
   await cp('src/i18n', 'dist/i18n', { recursive: true });
   console.log('Copying: public -> dist');
-  await cp('public', 'dist', { recursive: true }); // This might overwrite index.html if public/index.html exists
+  await cp('public', 'dist', { recursive: true }); 
+  
+  // Copy CSS
+  console.log('Copying: src/assets/styles.css -> dist/styles.css');
+  await cp('src/assets/styles.css', 'dist/styles.css');
 
   // Build HTML (After copy, to ensure index.html from template overwrites public/index.html)
   await buildHtml();
