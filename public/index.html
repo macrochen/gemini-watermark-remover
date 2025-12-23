@@ -36,7 +36,49 @@
     .scanner-base-img { display: block; width: auto; height: auto; max-width: 100%; max-height: 80vh; }
     .scanner-reveal-wrapper { position: absolute; top: 0; left: 0; bottom: 0; width: 0%; overflow: hidden; z-index: 10; border-right: 1px solid rgba(255,255,255,0.4); box-sizing: border-box; }
     .scanner-reveal-img { max-width: none; display: block; }
-    .scan-line { position: absolute; z-index: 20; background: #f59e0b; box-shadow: 0 0 15px 2px #f59e0b, 0 0 5px #fff; opacity: 0; pointer-events: none; }
+    /* Updated Scan Line with Handle */
+    .scan-line { 
+        position: absolute; 
+        z-index: 20; 
+        background: #f59e0b; 
+        box-shadow: 0 0 10px 1px rgba(245, 158, 11, 0.5); 
+        opacity: 0.8; 
+        pointer-events: none; /* Let events pass through to container */
+    }
+    /* Handle for the scan line */
+    .scan-line::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 32px;
+        height: 32px;
+        background: #f59e0b;
+        border-radius: 50%;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        z-index: 21;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 9l-4 4 4 4'/%3E%3Cpath d='M16 9l4 4-4 4'/%3E%3C/svg%3E");
+        background-position: center;
+        background-repeat: no-repeat;
+    }
+    
+    /* Interactive Scanner Stage */
+    .scanner-stage { 
+        position: relative; 
+        display: inline-flex; 
+        line-height: 0; 
+        max-width: 100%; 
+        max-height: 80vh; 
+        --scan-duration: 4s; 
+        cursor: ew-resize; /* Default Horizontal */
+        touch-action: none;
+        user-select: none;
+    }
+    .scanner-stage.vertical { cursor: ns-resize; }
+    
+    /* Disable drag on images inside scanner */
+    .scanner-base-img, .scanner-reveal-img { pointer-events: none; }
 
     @keyframes wrapperWidth { 0% { width: 0%; border-right-width: 0; } 5% { width: 0%; border-right-width: 2px; } 60% { width: 100%; border-right-width: 2px; } 85% { width: 100%; border-right-width: 0; } 100% { width: 100%; border-right-width: 0; } }
     @keyframes lineMoveH { 0% { left: 0%; opacity: 0; height: 100%; width: 2px; top: 0; } 5% { left: 0%; opacity: 1; } 60% { left: 100%; opacity: 1; } 61% { left: 100%; opacity: 0; } 100% { left: 100%; opacity: 0; height: 100%; width: 2px; top: 0; } }

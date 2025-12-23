@@ -5,11 +5,11 @@ export class TimeTraceViewer {
         this.lastCursorX = 0;
         this.lastCursorY = 0;
         this.isCursorInside = false;
+        this.isDragging = false;
         
         this.containerId = containerId;
         this.container = document.getElementById(containerId);
         
-        // If we are in 'quick' mode (modal), we expect elements to have IDs like 'quick-zoomSection'.
         this.prefix = containerId === 'timeTraceContainer' ? '' : 'quick-';
 
         this.init();
@@ -18,7 +18,6 @@ export class TimeTraceViewer {
     init() {
         if (!this.container) return; 
         
-        // Re-query elements based on prefix
         this.zoomSection = document.getElementById(this.prefix + 'zoomSection');
         this.scanSection = document.getElementById(this.prefix + 'scanSection');
         this.comparisonSection = document.getElementById(this.prefix + 'comparisonSection');
@@ -32,6 +31,7 @@ export class TimeTraceViewer {
         this.resultHint = this.container.querySelector('.result-hint');
         
         this.scannerStage = document.getElementById(this.prefix + 'scannerStage');
+        this.scannerWrapper = document.getElementById(this.prefix + 'scannerWrapper'); // Added
         this.scanBefore = document.getElementById(this.prefix + 'scanBefore');
         this.scanAfter = document.getElementById(this.prefix + 'scanAfter');
         this.btnPause = document.getElementById(this.prefix + 'btnPause');
@@ -55,7 +55,6 @@ export class TimeTraceViewer {
         this.container.style.display = 'block';
         const processedUrl = URL.createObjectURL(processedBlob);
         this.updateImages(originalImgSrc, processedUrl);
-        // Only scroll if it's the main container (not modal)
         if (this.containerId === 'timeTraceContainer') {
             this.container.scrollIntoView({ behavior: 'smooth' });
         }
@@ -192,6 +191,90 @@ export class TimeTraceViewer {
         if (btnV) btnV.addEventListener('click', () => this.forceScanDirection('v'));
         
         if (this.btnDownload) this.btnDownload.addEventListener('click', () => this.generateVideo());
+
+        // Manual Interaction
+        if (this.scannerStage) {
+            const startDrag = (e) => {
+                this.isDragging = true;
+                this.stopAnimation(); 
+                this.updateScannerPosition(e);
+            };
+            const onDrag = (e) => {
+                if (!this.isDragging) return;
+                e.preventDefault();
+                this.updateScannerPosition(e);
+            };
+            const stopDrag = () => {
+                this.isDragging = false;
+            };
+
+            this.scannerStage.addEventListener('mousedown', startDrag);
+            this.scannerStage.addEventListener('mousemove', onDrag);
+            this.scannerStage.addEventListener('mouseup', stopDrag);
+            this.scannerStage.addEventListener('mouseleave', stopDrag);
+
+            this.scannerStage.addEventListener('touchstart', startDrag, { passive: false });
+            this.scannerStage.addEventListener('touchmove', onDrag, { passive: false });
+            this.scannerStage.addEventListener('touchend', stopDrag);
+        }
+    }
+
+    stopAnimation() {
+        if (this.scannerStage) {
+            this.scannerStage.classList.remove('animate-scan-h', 'animate-scan-v');
+            this.scannerStage.classList.add('paused');
+            if (this.btnPause) {
+                this.btnPause.innerHTML = `<i data-lucide="play" class="w-3 h-3"></i> 继续`;
+                lucide.createIcons();
+            }
+        }
+    }
+
+    updateScannerPosition(e) {
+        if (!this.scannerStage || !this.scannerWrapper) return;
+        
+        const rect = this.scannerStage.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        
+        const isVertical = this.scannerStage.classList.contains('vertical'); 
+        const scanLine = this.scannerStage.querySelector('.scan-line');
+
+        if (isVertical) {
+            let y = clientY - rect.top;
+            y = Math.max(0, Math.min(y, rect.height));
+            const percent = (y / rect.height) * 100;
+            
+            this.scannerWrapper.style.width = '100%';
+            this.scannerWrapper.style.height = percent + '%';
+            this.scannerWrapper.style.borderRight = 'none';
+            this.scannerWrapper.style.borderBottom = '2px solid #f59e0b';
+            
+            if (scanLine) {
+                scanLine.style.width = '100%';
+                scanLine.style.height = '2px';
+                scanLine.style.top = percent + '%';
+                scanLine.style.left = '0';
+                scanLine.style.opacity = '1';
+            }
+        } else {
+            let x = clientX - rect.left;
+            x = Math.max(0, Math.min(x, rect.width));
+            const percent = (x / rect.width) * 100;
+            
+            this.scannerWrapper.style.height = '100%';
+            this.scannerWrapper.style.width = percent + '%';
+            this.scannerWrapper.style.borderBottom = 'none';
+            this.scannerWrapper.style.borderRight = '2px solid #f59e0b';
+            
+            if (scanLine) {
+                scanLine.style.height = '100%';
+                scanLine.style.width = '2px';
+                scanLine.style.left = percent + '%';
+                scanLine.style.top = '0';
+                scanLine.style.opacity = '1';
+            }
+        }
     }
 
     syncScannerImageSize() {
@@ -205,28 +288,70 @@ export class TimeTraceViewer {
 
     detectScanDirection() {
         if (!this.scannerStage || !this.scanBefore) return;
-        this.scannerStage.classList.remove('animate-scan-h', 'animate-scan-v');
+        this.scannerStage.classList.remove('animate-scan-h', 'animate-scan-v', 'vertical');
+        this.resetScannerStyles();
+
         if (this.scanBefore.naturalWidth > this.scanBefore.naturalHeight) {
             this.scannerStage.classList.add('animate-scan-h');
         } else {
-            this.scannerStage.classList.add('animate-scan-v');
+            this.scannerStage.classList.add('animate-scan-v', 'vertical');
         }
     }
 
     forceScanDirection(dir) {
         if (!this.scannerStage) return;
-        this.scannerStage.classList.remove('animate-scan-h', 'animate-scan-v');
-        if(dir === 'h') this.scannerStage.classList.add('animate-scan-h');
-        else this.scannerStage.classList.add('animate-scan-v');
+        this.scannerStage.classList.remove('animate-scan-h', 'animate-scan-v', 'vertical');
+        this.resetScannerStyles();
+
+        if(dir === 'h') {
+            this.scannerStage.classList.add('animate-scan-h');
+        } else {
+            this.scannerStage.classList.add('animate-scan-v', 'vertical');
+        }
         this.syncScannerImageSize();
+        
+        if (this.btnPause) {
+            this.btnPause.innerHTML = `<i data-lucide="pause" class="w-3 h-3"></i> 暂停`;
+            lucide.createIcons();
+        }
+    }
+    
+    resetScannerStyles() {
+        if (this.scannerWrapper) {
+            this.scannerWrapper.style.width = '';
+            this.scannerWrapper.style.height = '';
+            this.scannerWrapper.style.borderRight = '';
+            this.scannerWrapper.style.borderBottom = '';
+        }
+        const scanLine = this.scannerStage.querySelector('.scan-line');
+        if (scanLine) {
+            scanLine.style.top = '';
+            scanLine.style.left = '';
+            scanLine.style.width = '';
+            scanLine.style.height = '';
+            scanLine.style.opacity = '';
+        }
     }
 
     toggleScanPause() {
         if (!this.scannerStage || !this.btnPause) return;
-        this.scannerStage.classList.toggle('paused');
-        const isPaused = this.scannerStage.classList.contains('paused');
-        const icon = isPaused ? 'play' : 'pause';
-        this.btnPause.innerHTML = `<i data-lucide="${icon}" class="w-3 h-3"></i> ${isPaused ? '继续' : '暂停'}`;
+        
+        const hasAnimH = this.scannerStage.classList.contains('animate-scan-h');
+        const hasAnimV = this.scannerStage.classList.contains('animate-scan-v');
+        
+        if (!hasAnimH && !hasAnimV) {
+            this.resetScannerStyles();
+            const isVertical = this.scannerStage.classList.contains('vertical');
+            if (isVertical) this.scannerStage.classList.add('animate-scan-v');
+            else this.scannerStage.classList.add('animate-scan-h');
+            
+            this.btnPause.innerHTML = `<i data-lucide="pause" class="w-3 h-3"></i> 暂停`;
+        } else {
+            this.scannerStage.classList.toggle('paused');
+            const isPaused = this.scannerStage.classList.contains('paused');
+            const icon = isPaused ? 'play' : 'pause';
+            this.btnPause.innerHTML = `<i data-lucide="${icon}" class="w-3 h-3"></i> ${isPaused ? '继续' : '暂停'}`;
+        }
         lucide.createIcons();
     }
 
