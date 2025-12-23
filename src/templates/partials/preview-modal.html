@@ -1,0 +1,16 @@
+    <!-- Quick Preview Modal -->
+    <div id="quickPreviewModal" class="fixed inset-0 z-[200] hidden bg-dark flex flex-col">
+        <header class="h-14 border-b border-gray-800 flex items-center justify-between px-6 bg-dark shrink-0">
+            <h3 class="text-sm font-bold text-white">效果预览</h3>
+            <button id="closeQuickPreview" class="p-2 hover:bg-gray-800 rounded-lg text-gray-400 hover:text-white transition-colors">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+        </header>
+        <div id="quickPreviewStage" class="flex-1 overflow-y-auto p-8 relative">
+            <!-- TimeTraceViewer will mount here -->
+            <div id="quickTimeTraceContainer">
+                <!-- Copy structure from main stage but simplified if needed. For reuse, we can just clone the structure or dynamically inject it. -->
+                <!-- We will inject the HTML structure dynamically in JS to avoid duplication -->
+            </div>
+        </div>
+    </div>

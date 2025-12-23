@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>时光修复师 2.0 - 专业修图验收平台</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#10B981',
+            'primary-hover': '#059669',
+            dark: '#0F172A',
+            'side-dark': '#1E293B'
+          }
+        }
+      }
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; }
+    
+    /* TimeTrace Styles */
+    .img-zoom-container { position: relative; width: 100%; overflow: hidden; border-radius: 8px; cursor: crosshair; }
+    .zoom-source-img { width: 100%; height: auto; display: block; filter: brightness(0.9); }
+    .img-zoom-lens { position: absolute; border: 2px solid #f59e0b; background-color: rgba(255, 255, 255, 0.2); width: 100px; height: 100px; z-index: 10; pointer-events: none; box-shadow: 0 0 10px rgba(0,0,0,0.5); display: none; }
+    .img-zoom-result { width: 100%; min-height: 400px; height: 100%; border-radius: 8px; background-repeat: no-repeat; background-color: #1e293b; box-shadow: inset 0 0 20px rgba(0,0,0,0.5); border: 1px solid #334155; position: relative; }
+    .result-hint { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #64748b; font-size: 14px; pointer-events: none; text-align: center; }
+
+    .scanner-container { width: 100%; background-color: #1e293b; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5); padding: 20px; display: flex; justify-content: center; align-items: center; overflow: hidden; }
+    .scanner-stage { 
+        position: relative; 
+        display: inline-flex; 
+        line-height: 0; 
+        max-width: 100%; 
+        max-height: 80vh; 
+        --scan-duration: 4s;
+        cursor: ew-resize;
+        touch-action: none;
+        user-select: none;
+    }
+    .scanner-stage.vertical { cursor: ns-resize; }
+    .scanner-base-img { display: block; width: auto; height: auto; max-width: 100%; max-height: 80vh; pointer-events: none; }
+    .scanner-reveal-wrapper { position: absolute; top: 0; left: 0; bottom: 0; width: 0%; overflow: hidden; z-index: 10; border-right: 1px solid rgba(255,255,255,0.4); box-sizing: border-box; }
+    .scanner-reveal-img { max-width: none; display: block; pointer-events: none; }
+    
+    .scan-line { 
+        position: absolute; 
+        z-index: 20; 
+        background: #f59e0b; 
+        box-shadow: 0 0 10px 1px rgba(245, 158, 11, 0.5); 
+        opacity: 0.8; 
+        pointer-events: none; 
+    }
+    .scan-line::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 32px;
+        height: 32px;
+        background: #f59e0b;
+        border-radius: 50%;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        z-index: 21;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 9l-4 4 4 4'/%3E%3Cpath d='M16 9l4 4-4 4'/%3E%3C/svg%3E");
+        background-position: center;
+        background-repeat: no-repeat;
+    }
+    .scanner-stage.vertical .scan-line::after { transform: translate(-50%, -50%) rotate(90deg); }
+
+    @keyframes wrapperWidth { 0% { width: 0%; border-right-width: 0; } 5% { width: 0%; border-right-width: 2px; } 60% { width: 100%; border-right-width: 2px; } 85% { width: 100%; border-right-width: 0; } 100% { width: 100%; border-right-width: 0; } }
+    @keyframes lineMoveH { 0% { left: 0%; opacity: 0; height: 100%; width: 2px; top: 0; } 5% { left: 0%; opacity: 1; } 60% { left: 100%; opacity: 1; } 61% { left: 100%; opacity: 0; } 100% { left: 100%; opacity: 0; height: 100%; width: 2px; top: 0; } }
+    @keyframes wrapperHeight { 0% { height: 0%; border-bottom-width: 0; width: 100%; border-right: none; } 5% { height: 0%; border-bottom-width: 2px; } 60% { height: 100%; border-bottom-width: 2px; } 85% { height: 100%; border-bottom-width: 0; } 100% { height: 100%; border-bottom-width: 0; width: 100%; border-right: none; } }
+    @keyframes lineMoveV { 0% { top: 0%; opacity: 0; width: 100%; height: 2px; left: 0; } 5% { top: 0%; opacity: 1; } 60% { top: 100%; opacity: 1; } 61% { top: 100%; opacity: 0; } 100% { top: 100%; opacity: 0; width: 100%; height: 2px; left: 0; } }
+
+    .animate-scan-h .scanner-reveal-wrapper { animation: wrapperWidth var(--scan-duration) ease-in-out infinite; height: 100% !important; }
+    .animate-scan-h .scan-line { animation: lineMoveH var(--scan-duration) ease-in-out infinite; }
+    .animate-scan-v .scanner-reveal-wrapper { animation: wrapperHeight var(--scan-duration) ease-in-out infinite; width: 100% !important; border-right: none; border-bottom: 1px solid rgba(255,255,255,0.4); }
+    .animate-scan-v .scan-line { animation: lineMoveV var(--scan-duration) ease-in-out infinite; }
+    .paused .scanner-reveal-wrapper, .paused .scan-line { animation-play-state: paused; }
+    .spinner { animation: spin 1s linear infinite; }
+    @keyframes spin { 100% { transform: rotate(360deg); } }
+    
+    .custom-select { appearance: none; background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%2394a3b8' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e"); background-position: right 0.5rem center; background-repeat: no-repeat; background-size: 1.5em 1.5em; padding-right: 2.5rem; }
+  </style>
+</head>
+<body class="bg-dark text-gray-100 flex h-screen overflow-hidden">
+
+  <!-- INCLUDE: sidebar.html -->
+
+  <!-- Main Workspace -->
+  <main class="flex-1 flex flex-col min-w-0 relative">
+    
+    <!-- INCLUDE: project-view.html -->
+
+    <!-- INCLUDE: tools-view.html -->
+
+    <!-- Status Bar (Loading) -->
+    <div id="loadingOverlay" class="absolute inset-0 z-[60] bg-dark/80 backdrop-blur-sm hidden flex items-center justify-center">
+      <div class="flex flex-col items-center">
+        <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mb-4"></div>
+        <p class="text-gray-400 text-xs font-bold uppercase tracking-widest">处理中...</p>
+      </div>
+    </div>
+
+    <!-- INCLUDE: modals.html -->
+  </main>
+
+  <!-- INCLUDE: preview-modal.html -->
+
+  <script src="app.js"></script>
+</body>
+</html>

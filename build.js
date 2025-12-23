@@ -1,5 +1,6 @@
 import * as esbuild from 'esbuild';
-import { cp, mkdir } from 'fs/promises';
+import { cp, mkdir, readFile, writeFile } from 'fs/promises';
+import { join } from 'path';
 
 const userscriptBanner = `// ==UserScript==
 // @name         Gemini NanoBanana Watermark Remover
@@ -19,6 +20,41 @@ const userscriptBanner = `// ==UserScript==
 // @run-at       document-end
 // ==/UserScript==
 `;
+
+async function buildHtml() {
+  console.log('Building: dist/index.html');
+  try {
+    const templatePath = 'src/templates/layout.html';
+    let html = await readFile(templatePath, 'utf-8');
+
+    // Simple regex to find includes: <!-- INCLUDE: filename.html -->
+    const includePattern = /<!--\s*INCLUDE:\s*([a-zA-Z0-9_.-]+)\s*-->/g;
+    
+    // Process includes asynchronously
+    const replacements = [];
+    let match;
+    while ((match = includePattern.exec(html)) !== null) {
+      replacements.push({
+        placeholder: match[0],
+        filename: match[1]
+      });
+    }
+
+    for (const item of replacements) {
+      const partialPath = join('src/templates/partials', item.filename);
+      try {
+        const content = await readFile(partialPath, 'utf-8');
+        html = html.replace(item.placeholder, content);
+      } catch (err) {
+        console.warn(`Warning: Partial ${item.filename} not found.`);
+      }
+    }
+
+    await writeFile('dist/index.html', html);
+  } catch (err) {
+    console.error('HTML Build Failed:', err);
+  }
+}
 
 async function build() {
   console.log(`Start Build... ${process.env.NODE_ENV === 'production' ? 'production' : 'development'}\r\n`);
@@ -62,7 +98,10 @@ async function build() {
   console.log('Copying: src/i18n -> dist/i18n');
   await cp('src/i18n', 'dist/i18n', { recursive: true });
   console.log('Copying: public -> dist');
-  await cp('public', 'dist', { recursive: true });
+  await cp('public', 'dist', { recursive: true }); // This might overwrite index.html if public/index.html exists
+
+  // Build HTML (After copy, to ensure index.html from template overwrites public/index.html)
+  await buildHtml();
 
   console.log('\r\n✓ Build complete');
 }
