@@ -40,7 +40,17 @@ export async function handleCopyImage() {
 }
 
 export async function handleExportVideo() {
-    // ... (rest kept same)
+    showLoading();
+    try {
+        const result = await context.viewer.generateVideo();
+        const fileName = `scan_video_${Date.now()}.${result.ext}`;
+        await saveOrDownload(fileName, result.blob);
+    } catch (err) {
+        console.error('Export Video failed:', err);
+        alert('导出视频失败: ' + err.message);
+    } finally {
+        hideLoading();
+    }
 }
 
 async function saveOrDownload(fileName, blob) {
