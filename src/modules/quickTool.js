@@ -203,6 +203,13 @@ async function processItem(item) {
         saveBtn.onclick = () => saveItem(item);
         actionContainer.appendChild(saveBtn);
 
+        // Copy Button
+        const copyBtn = document.createElement('button');
+        copyBtn.className = 'px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white text-xs rounded border border-gray-600 transition-colors flex items-center gap-1';
+        copyBtn.innerHTML = `<i data-lucide="copy" class="w-3 h-3"></i> <span id="copy-text-${item.id}">复制</span>`;
+        copyBtn.onclick = () => copyItem(item);
+        actionContainer.appendChild(copyBtn);
+
         // Overwrite Button
         if (item.handle) {
             const overwriteBtn = document.createElement('button');
@@ -251,6 +258,27 @@ async function saveItem(item) {
     a.href = url;
     a.download = `clean_${item.file.name}`;
     a.click();
+}
+
+async function copyItem(item) {
+    if (!item.processed) return;
+    try {
+        const clipboardItem = new ClipboardItem({ [item.processed.type]: item.processed });
+        await navigator.clipboard.write([clipboardItem]);
+        
+        const textSpan = document.getElementById(`copy-text-${item.id}`);
+        if (textSpan) {
+            const originalText = textSpan.innerText;
+            textSpan.innerText = '已复制';
+            setTimeout(() => {
+                const el = document.getElementById(`copy-text-${item.id}`);
+                if (el) el.innerText = originalText;
+            }, 2000);
+        }
+    } catch (err) {
+        console.error('Copy to clipboard failed:', err);
+        alert('复制到剪贴板失败，可能是当前环境不支持或未授予权限。');
+    }
 }
 
 async function overwriteItem(item) {

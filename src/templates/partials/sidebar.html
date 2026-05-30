@@ -8,17 +8,17 @@
       
       <!-- Navigation Tabs -->
       <nav class="space-y-1 mb-6">
-        <button id="navProjectBtn" class="w-full text-left px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-3 bg-primary/10 text-primary ring-1 ring-primary/20 transition-all">
-            <i data-lucide="layout" class="w-4 h-4"></i>
-            项目验收
-        </button>
-        <button id="navToolBtn" class="w-full text-left px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-3 text-gray-400 hover:bg-gray-800 hover:text-gray-200 transition-all">
+        <button id="navToolBtn" class="w-full text-left px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-3 bg-primary/10 text-primary ring-1 ring-primary/20 transition-all">
             <i data-lucide="zap" class="w-4 h-4"></i>
             快速去水印
         </button>
+        <button id="navProjectBtn" class="w-full text-left px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-3 text-gray-400 hover:bg-gray-800 hover:text-gray-200 transition-all">
+            <i data-lucide="layout" class="w-4 h-4"></i>
+            项目验收
+        </button>
       </nav>
 
-      <div id="projectControls">
+      <div id="projectControls" style="display: none;">
           <button id="mountBtn" class="w-full py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg border border-gray-700 text-xs font-bold transition-all flex items-center justify-center gap-2">
             <i data-lucide="folder-open" class="w-4 h-4"></i>
             打开工作目录
@@ -26,7 +26,7 @@
       </div>
     </div>
     
-    <div id="sidebarTree" class="flex-1 overflow-y-auto no-scrollbar">
+    <div id="sidebarTree" class="flex-1 overflow-y-auto no-scrollbar" style="display: none;">
       <!-- Sidebar Tree Content -->
     </div>
 
